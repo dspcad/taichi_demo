@@ -43,10 +43,10 @@ RES_ = (H, W)
 
 NUM_EXPLOSIONS = 8
 NUM_PARTICLES = 70
-output_texture  = ti.Vector.ndarray(4, dtype=ti.f32, shape=RES)
-#output_texture = ti.Texture(ti.Format.rgba32f, RES)
+input_texture  = ti.Vector.ndarray(4, dtype=ti.f32, shape=RES)
+output_texture = ti.Texture(ti.Format.rgba32f, RES)
 #output_texture = ti.Vector.field(4, dtype=ti.f32, shape=RES)
-print(output_texture.shape)
+#print(output_texture.shape)
 iTime          = ti.ndarray(dtype=ti.f32, shape=(1))
 
 #image = ti.Vector.field(4, dtype=ti.f32, shape=RES)
@@ -139,10 +139,10 @@ def Rainbow(c,iTime : ti.types.ndarray(ndim=1)):
 
 
 @ti.kernel
-def draw(output_texture: ti.types.ndarray(dtype=ti.math.vec4, ndim=2),
-        #input_texture_nd: ti.types.ndarray(ndim=2), 
-        iTime: ti.types.ndarray(ndim=1)):
-    for i, j in output_texture:
+def draw(output_texture: ti.types.rw_texture(num_dimensions=2, fmt=ti.Format.rgba32f, lod=0), 
+         input_texture:  ti.types.ndarray(dtype=ti.math.vec4, ndim=2),
+         iTime:          ti.types.ndarray(ndim=1)):
+    for i, j in input_texture:
         uv = vec2(i/RES[0], j/RES[1])
         uv.x -= .5
         uv.x *= RES[0]/RES[1]
@@ -164,36 +164,43 @@ def draw(output_texture: ti.types.ndarray(dtype=ti.math.vec4, ndim=2),
             c += explosion(uv, p, idx, et)
 	  
         c = Rainbow(c,iTime)
-        #output_texture.store(ti.Vector([i, j]), vec4(c, 1.))
-        output_texture[i, j] = vec4(c, 1.)
+        input_texture[i, j] = vec4(c, 1.)
+        output_texture.store(ti.Vector([i, j]), input_texture[i, j])
 	   
         #image[i, j] = vec4(c, 1.)
 		#image[i, j] = vec4(1.,0.,1., 1.)
 
 
-#if __name__ == "__main__":
-#    # Serialize!
-#    mod = ti.aot.Module(arch)
-#
-#    mod.add_kernel(draw)
-#
-#
-#    if platform == "android":
-#        mod.archive(get_archive_path())
-#    else:
-#        save_dir = get_save_dir("fireworks", args.arch)
-#        os.makedirs(save_dir, exist_ok=True)
-#        mod.save(save_dir)
-
-
-if __name__ == "__main__":
+def main():
    gui = ti.GUI('Fireworks', res=RES)
    # canvas    = gui.get_canvas()
    iTime[0] = 0.0
    while gui.running:
        print(iTime[0])
        iTime[0] += 0.01
-       draw(output_texture, iTime)
-       gui.set_image(output_texture.to_numpy())
+       draw(output_texture, input_texture, iTime)
+       gui.set_image(input_texture.to_numpy())
        gui.show()
 
+def aot():
+    # Serialize!
+    mod = ti.aot.Module(arch)
+
+    mod.add_kernel(draw,
+                   template_args={
+                    'input_texture':  input_texture,
+                    'iTime': iTime
+                    })
+
+
+    if platform == "android":
+        mod.archive(get_archive_path())
+    else:
+        save_dir = get_save_dir("fireworks", args.arch)
+        os.makedirs(save_dir, exist_ok=True)
+        mod.save(save_dir)
+
+
+if __name__ == "__main__":
+    aot()
+    #main()

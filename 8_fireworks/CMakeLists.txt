@@ -1,0 +1,5 @@
+add_demo(8_fireworks ${CMAKE_CURRENT_SOURCE_DIR}/app.cpp)
+generate_aot_files(8_fireworks "assets/fireworks.py" "vulkan")
+generate_aot_files(8_fireworks "assets/fireworks.py" "x64")
+generate_aot_files(8_fireworks "assets/fireworks.py" "cuda")
+generate_aot_files(8_fireworks "assets/fireworks.py" "android-vulkan")
